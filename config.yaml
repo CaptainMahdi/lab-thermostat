@@ -1,0 +1,13 @@
+app:
+  name: SmartThermo
+  version: 1.2.0
+  features:
+    - temperature_control
+    - remote_access
+    - energy_saving
+  mode: off
+  set_point: 72
+
+logging:
+  level: info
+  file: logs/output.log
