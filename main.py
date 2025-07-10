@@ -1,25 +1,9 @@
 import yaml
+import os
 from dataclasses import dataclass
 from typing import List, Dict, Any
-import os
 
-config_dict = {}
-
-# Step 1: Define your data class
-@dataclass
-class ThemeConfig:
-    background: str
-    font_size: int
-
-@dataclass
-class AppConfig:
-    app_name: str
-    version: float
-    author: str
-    theme: ThemeConfig
-    settings: Dict[str, Any]
-    
-unit = "None"
+CONFIG_PATH = "config.yaml"
 
 @dataclass
 class SmartThermo:
@@ -31,29 +15,31 @@ class SmartThermo:
 
     def change_mode(self, new_mode: str):
         self.mode = new_mode
+        print(f"Mode changed to {new_mode}")
 
     def update_set_point(self, new_temp: int):
         self.set_point = new_temp
-    def save_to_file(self, path: str, logging_config: dict):
+        print(f"Set point changed to {new_temp}")
+
+    def to_dict(self, logging: dict) -> dict:
+        return {
+            'app': {
+                'name': self.name,
+                'version': self.version,
+                'features': self.features,
+                'mode': self.mode,
+                'set_point': self.set_point,
+            },
+            'logging': logging
+        }
+
+    def save(self, path: str, logging: dict):
         with open(path, 'w') as f:
-            yaml.dump({
-                'app': {
-                    'name': self.name,
-                    'version': self.version,
-                    'features': self.features,
-                    'mode': self.mode,
-                    'set_point': self.set_point
-                },
-                'logging': logging_config
-            }, f)
+            yaml.dump(self.to_dict(logging), f)
 
-
-# Step 2: Load YAML config file
-
-def load_config(file_path: str) -> tuple[SmartThermo, dict]:
-    if not os.path.exists(file_path):
-        # Create a default config if file is missing
-        default_config = {
+def load_config(path: str) -> tuple[SmartThermo, dict]:
+    if not os.path.exists(path):
+        config = {
             'app': {
                 'name': 'SmartThermo',
                 'version': '1.0.0',
@@ -66,24 +52,19 @@ def load_config(file_path: str) -> tuple[SmartThermo, dict]:
                 'file': 'logs/output.log'
             }
         }
-        with open(file_path, 'w') as f:
-            yaml.dump(default_config, f)
-        config = default_config
+        with open(path, 'w') as f:
+            yaml.dump(config, f)
     else:
-        with open(file_path, 'r') as f:
+        with open(path, 'r') as f:
             config = yaml.safe_load(f)
 
-    # Validate presence of required fields
-    if 'app' not in config or 'logging' not in config:
-        raise ValueError("Missing required sections: 'app' or 'logging'")
+    app = config.get('app', {})
+    logging = config.get('logging', {})
 
-    app = config['app']
-    required_fields = ['name', 'version', 'features', 'mode', 'set_point']
-    for field in required_fields:
-        if field not in app:
-            raise ValueError(f"Missing required config field: {field}")
+    required = ['name', 'version', 'features', 'mode', 'set_point']
+    if not all(k in app for k in required):
+        raise ValueError("Missing required fields in 'app' config")
 
-    # Create the SmartThermo object
     thermo = SmartThermo(
         name=app['name'],
         version=app['version'],
@@ -91,35 +72,23 @@ def load_config(file_path: str) -> tuple[SmartThermo, dict]:
         mode=app['mode'],
         set_point=app['set_point']
     )
-
-    return thermo, config['logging']
-
+    return thermo, logging
 
 def print_summary(thermo: SmartThermo, logging: dict):
-    print("Loading config from config.yaml...")
-    print(f"Application: {thermo.name} (v{thermo.version})")
-    print("Enabled Features:")
-    for feature in thermo.features:
-        print(f"- {feature}")
-    print(f"Mode: {thermo.mode}")
-    print(f"Set Point: {thermo.set_point}")
-    print(f"Logging: {logging['level']} -> {logging['file']}")
+    print(f"""Loading config from {CONFIG_PATH}...
+Application: {thermo.name} (v{thermo.version})
+Enabled Features: {', '.join(thermo.features)}
+Mode: {thermo.mode}
+Set Point: {thermo.set_point}
+Logging: {logging.get('level')} -> {logging.get('file')}""")
 
-
-# Step 3: Use the config
 if __name__ == "__main__":
-    thermo, logging = load_config("config.yaml")
+    thermo, logging = load_config(CONFIG_PATH)
     print_summary(thermo, logging)
-    
-    # Simulate runtime state changes
+
     print("\nUpdating thermostat state...\n")
-    thermo.change_mode("heat")
-    thermo.update_set_point(70)
+    thermo.change_mode("cool")
+    thermo.update_set_point(67)
+    thermo.save(CONFIG_PATH, logging)
 
-    # Save the updated state
-    thermo.save_to_file("config.yaml", logging_config)
-
-    print("Updated and saved new config:")
-    print_summary(thermo, logging_config)
-
-    
+    print("Updated and saved new config:") 
